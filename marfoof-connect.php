@@ -226,7 +226,7 @@ function marfoof_connect_render_settings_page()
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-API-Key': 'marfoof-test-key-123' // Example server API key
+                            'X-API-Key': 'marfoof-secret-static-key-here-123' // Example server API key
                         },
                         body: JSON.stringify(data)
                     });
