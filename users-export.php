@@ -1,27 +1,65 @@
 <?php
+// File: users-export.php
+
 /**
- * User export related REST API for Marfoof Connect
+ * Export users with pagination/chunking support
  */
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+function marfoof_connect_export_users(WP_REST_Request $request) {
+    $params = $request->get_params();
+    $action = isset($params['action']) ? sanitize_text_field($params['action']) : 'preview';
+    
+    switch ($action) {
+        case 'preview':
+            return marfoof_connect_preview_users();
+            
+        case 'start_migration':
+            $batch_size = isset($params['batch_size']) ? (int)$params['batch_size'] : 500;
+            $force_restart = isset($params['force_restart']) ? (bool)$params['force_restart'] : false;
+            return marfoof_connect_start_migration('users', $batch_size, $force_restart);
+            
+        case 'migrate_batch':
+            $batch_number = isset($params['batch']) ? (int)$params['batch'] : 1;
+            $batch_size = isset($params['batch_size']) ? (int)$params['batch_size'] : 500;
+            return marfoof_connect_migrate_batch('users', $batch_number, $batch_size);
+            
+        case 'migration_status':
+            return marfoof_connect_get_migration_status('users');
+            
+        case 'reset_migration':
+            return marfoof_connect_reset_migration('users');
+            
+        case 'get_all':
+            return marfoof_connect_get_all_users();
+            
+        default:
+            return new WP_Error('invalid_action', 'Invalid action specified', array('status' => 400));
+    }
 }
 
+/**
+ * Preview users before migration
+ */
+function marfoof_connect_preview_users() {
+    $stats = marfoof_connect_get_migration_stats('users');
+    return rest_ensure_response($stats);
+}
 
 /**
- * The callback function to get users and their metadata.
+ * Get all users (original function)
  */
-function marfoof_connect_export_users( WP_REST_Request $request ) {
-    $all_users = get_users();
-    $users_data_with_meta = array();
-    foreach ( $all_users as $user ) {
-        $user_data = $user->to_array();
-        $user_meta = get_user_meta( $user->ID );
-        $combined_data = array_merge( $user_data,
-            array( 'meta_data' => $user_meta ) ,
-            array('roles' => $user_roles = $user->roles ),
-            array('capabilities' => $user_roles = $user->allcaps )
-        );
-        $users_data_with_meta[] = $combined_data;
+function marfoof_connect_get_all_users() {
+    global $wpdb;
+    
+    $users = $wpdb->get_results("SELECT * FROM {$wpdb->users} ORDER BY ID ASC");
+    
+    $users_data = array();
+    
+    foreach ($users as $user) {
+        $user_data = marfoof_connect_prepare_user_data($user);
+        if ($user_data) {
+            $users_data[] = $user_data;
+        }
     }
-    return new WP_REST_Response( $users_data_with_meta, 200 );
+    
+    return rest_ensure_response($users_data);
 }
